@@ -68,7 +68,6 @@ function Toolbar({addRect, canvas, addText, draw, select, active, emitModify, em
     const removeGroup = () => {
         const activeObj = canvas.getActiveObject()
         unGroup()
-        removeInState(activeObj)
     }
 
     if (!active) {

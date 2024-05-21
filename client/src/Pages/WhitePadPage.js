@@ -380,20 +380,23 @@ function WhitePadPage() {
 
             for (var obj in groupDic) {
                 var g = groupDic[obj]
-                var left = g.left
-                var top = g.top
-                var objectsInGroup = g.objects
-                var objsInGroup = []
-                objectsInGroup.forEach((obj) => {
-                    var curr = groupGet(obj.id)
-                    objsInGroup.push(curr)
-                    groupRemove(obj.id)
-                })
+                if (!g.hidden) {
+                    var left = g.left
+                    var top = g.top
+                    var objectsInGroup = g.objects
+                    var objsInGroup = []
+                    objectsInGroup.forEach((obj) => {
+                        console.log(obj)
+                        var curr = groupGet(obj.id)
+                        objsInGroup.push(curr)
+                        groupRemove(obj.id)
+                    })
 
-                console.log(objsInGroup)
-                var group = new fabric.Group(objsInGroup, {left: left, top: top, id: obj})
-                addToDic(group)
-                canvas.add(group)
+                    console.log(objsInGroup)
+                    var group = new fabric.Group(objsInGroup, {left: left, top: top, id: obj})
+                    addToDic(group)
+                    canvas.add(group)
+                }
 
                 // var activeObj = canvas.getActiveObject();
                 // var left = activeObj.left
@@ -711,6 +714,8 @@ function WhitePadPage() {
                     group.set({id: id})
                     group.set({left: left})
                     group.set({top: top})
+                    group.set({hidden: false})
+                    addToDic(group)
                     canvas.add(group)
                     canvas.renderAll()
                 }
@@ -723,6 +728,8 @@ function WhitePadPage() {
                         if (obj.id === id) {
                             var objectsInGroup = obj._objects
                             obj._restoreObjectsState()
+                            obj.set({hidden: true})
+                            modifyInDic(obj)
                             canvas.remove(obj)
                             for (var i = 0; i < objectsInGroup.length; i++) {
                                 canvas.add(objectsInGroup[i])
@@ -860,16 +867,32 @@ function WhitePadPage() {
 
     const addToDic = (obj) => {
         const pastState = new objStack()
-        pastState.push(obj.toObject(['id']))
+        if (obj.connectors) {
+            pastState.push(obj.toObject(['id', 'connectors']))
+        } else if (obj.type === 'group') {
+            pastState.push(obj.toObject(['id', 'hidden']))
+        } else if (obj.type === 'lineArrow') {
+            pastState.push(obj.toObject(['id', 'fromPort', 'toPort', 'locations']))
+        } else {
+            pastState.push(obj.toObject(['id']))
+        }
         const futureState = new objStack()
         objectDic[obj.id] = [pastState, futureState]
     }
 
     const modifyInDic = (obj) => {
         const info = objectDic[obj.id]
-        const past = info[0]
-        past.push(obj.toObject(['id']))
-        objectDic[obj.id] = [past, info[1]]
+        const pastState = info[0]
+        if (obj.connectors) {
+            pastState.push(obj.toObject(['id', 'connectors']))
+        } else if (obj.type === 'group') {
+            pastState.push(obj.toObject(['id', 'hidden']))
+        } else if (obj.type === 'lineArrow') {
+            pastState.push(obj.toObject(['id', 'fromPort', 'toPort', 'locations']))
+        } else {
+            pastState.push(obj.toObject(['id']))
+        }
+        objectDic[obj.id] = [pastState, info[1]]
     }
 
     const removeInDic = (id) => {
@@ -880,7 +903,15 @@ function WhitePadPage() {
     const addToState = (obj) => {
         wpState.push({action: 'add', object: obj})
         const pastState = new objStack()
-        pastState.push(obj.toObject(['id']))
+        if (obj.connectors) {
+            pastState.push(obj.toObject(['id', 'connectors']))
+        } else if (obj.type === 'group') {
+            pastState.push(obj.toObject(['id', 'hidden']))
+        } else if (obj.type === 'lineArrow') {
+            pastState.push(obj.toObject(['id', 'fromPort', 'toPort', 'locations']))
+        } else {
+            pastState.push(obj.toObject(['id']))
+        }
         const futureState = new objStack()
         objectDic[obj.id] = [pastState, futureState]
     }
@@ -888,9 +919,17 @@ function WhitePadPage() {
     const modifyInState = (obj) => {
         wpState.push({action: 'modify', object: obj})
         const info = objectDic[obj.id]
-        const past = info[0]
-        past.push(obj.toObject(['id']))
-        objectDic[obj.id] = [past, info[1]]
+        const pastState = info[0]
+        if (obj.connectors) {
+            pastState.push(obj.toObject(['id', 'connectors']))
+        } else if (obj.type === 'group') {
+            pastState.push(obj.toObject(['id', 'hidden']))
+        } else if (obj.type === 'lineArrow') {
+            pastState.push(obj.toObject(['id', 'fromPort', 'toPort', 'locations']))
+        } else {
+            pastState.push(obj.toObject(['id']))
+        }
+        objectDic[obj.id] = [pastState, info[1]]
     }
 
     // const save = () => {
@@ -912,6 +951,7 @@ function WhitePadPage() {
 
     const removeInState = (obj) => {
         wpState.push({action: 'remove', object: obj})
+        modifyInDic(obj)
     }
 
     const getLast = () => {
@@ -1453,7 +1493,7 @@ function WhitePadPage() {
             canvas.remove(obj)
         })
 
-        var group = new fabric.Group(objectsInGroup, {left: left, top: top, id: uuid()})
+        var group = new fabric.Group(objectsInGroup, {left: left, top: top, id: uuid(), hidden: false})
         console.log(group.id)
         canvas.add(group)
         canvas.renderAll()
@@ -1598,6 +1638,8 @@ function WhitePadPage() {
         var objId = activeObj.id
         var objectsInGroup = activeObj._objects
         activeObj._restoreObjectsState()
+        activeObj.set({hidden: true})
+        removeInState(activeObj)
         canvas.remove(activeObj)
         for (var i = 0; i < objectsInGroup.length; i++) {
             console.log(objectsInGroup[i].id)
