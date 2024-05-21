@@ -8,6 +8,7 @@ import ResponsiveCanvas from '../Components/ResponsiveCanvas'
 import {fabric} from 'fabric'
 import {v1 as uuid} from 'uuid'
 import { objStack } from '../Utils/objStack'
+import { Redirect, useHistory } from 'react-router'
 
 var wpState, wpFuture
 var objectDic = {}
@@ -270,6 +271,9 @@ function WhitePadPage() {
     const [room, setRoom] = useState('')
     const [canvas, setCanvas] = useState(null)
     const [active, setActive] = useState(null)
+    const [initCanvas, setInitCanvas] = useState(false)
+    const [initObjects, setInitObjects] = useState(null)
+    const history = useHistory()
     const types = ['rect', 'triangle', 'textbox', 'ellispe', 'polygon', 'path']
     var selected
     var isMouseDown = false
@@ -291,7 +295,9 @@ function WhitePadPage() {
     //     console.log('updated')
     // }, [canvas])
 
-    console.log(active)
+    if (active) {
+        console.log(active.left)
+    }
 
     // const save = () => {
     //     redo = []
@@ -300,7 +306,6 @@ function WhitePadPage() {
     //     }
     //     wpState = JSON.stringify(canvas)
     // }
-
 
     useEffect(() => {
 
@@ -311,13 +316,128 @@ function WhitePadPage() {
         setRoom(room)
         setName(name)
         socket.emit('newRoomJoin', {room, name})
+        var currName = name
 
-        socket.on('usersUpdate', ({users}) => {
+        // socket.on('usersUpdate', ({users}) => {
+        //     console.log(users)
+        //     setUsers(users)
+        // })
+
+        
+        socket.on('usersUpdate', ({users, initObjs, name}) => {
             console.log(users)
+            console.log(name)
+            console.log(initObjs)
+            console.log(thisname)
+            if (currName === name && initObjs !== null) {
+                setInitObjects(initObjs)
+            }
             setUsers(users)
         })
         
     }, [])
+
+    useEffect(() => {
+        console.log(initCanvas)
+        if (initCanvas && initObjects !== null) {
+            console.log(initCanvas)
+            canvas.selection = false
+            var groupDic = {}
+            for (var obj in initObjects) {
+                console.log(obj)
+                var info = initObjects[obj]
+                var pastStack = info[0]
+                var curr = pastStack.data.at(-1)
+                console.log(curr)
+                let object
+                
+                if (curr.type === 'rect') {
+                    object = new fabric.Rect()
+                } else if (curr.type === 'path') {
+                    object = new fabric.Path(curr.path, {fill: curr.fill, stroke: curr.stroke, strokeWidth: curr.strokeWidth})
+                    
+                } else if (curr.type === 'textbox') {
+                    object = new fabric.Textbox('')
+                }  else if (curr.type === 'triangle') {
+                    object = new fabric.Triangle()
+                } else if (curr.type === 'ellipse') {
+                    object = new fabric.Ellipse()
+                } else if (curr.type === 'polygon') {
+                    object = new fabric.Polygon()
+                } else if (curr.type === 'group') {
+                    groupDic[obj] = curr
+                    continue
+                } else if (curr.type === 'lineArrow') {
+                    object = new fabric.LineArrow()
+                }
+
+                object.set({id: obj})
+                object.set(curr)
+                addToDic(object)
+                canvas.add(object)
+                console.log(object.id)
+            }
+
+            for (var obj in groupDic) {
+                var g = groupDic[obj]
+                var left = g.left
+                var top = g.top
+                var objectsInGroup = g.objects
+                var objsInGroup = []
+                objectsInGroup.forEach((obj) => {
+                    var curr = groupGet(obj.id)
+                    objsInGroup.push(curr)
+                    groupRemove(obj.id)
+                })
+
+                console.log(objsInGroup)
+                var group = new fabric.Group(objsInGroup, {left: left, top: top, id: obj})
+                addToDic(group)
+                canvas.add(group)
+
+                // var activeObj = canvas.getActiveObject();
+                // var left = activeObj.left
+                // var top = activeObj.top
+                // var objIds = []
+                // var objectsInGroup = activeObj._objects
+                // objectsInGroup.forEach((obj) => {
+                //     objIds.push(obj.id)
+                //     canvas.remove(obj)
+                // })
+
+                // var group = new fabric.Group(objectsInGroup, {left: left, top: top, id: uuid()})
+                // console.log(group.id)
+                // canvas.add(group)
+                // canvas.renderAll()
+                // addToState(group)
+                // emitGroup({objectsInGroup: objIds, left: left, top: top, id: group.id, oriName: thisname})
+            }
+
+            canvas.selection = true
+            canvas.renderAll()
+            setInitObjects(null)
+
+        }
+    }, [initCanvas, initObjects])
+
+    const groupRemove = (id) => {
+        canvas.forEachObject(function(obj) {
+            if (obj.id === id) {
+                canvas.remove(obj)
+            }
+        })
+    }
+
+    const groupGet = (id) => {
+        var curr = null
+        canvas.forEachObject(function(obj) {
+            if (obj.id === id) {
+                curr = obj
+            }
+        })
+
+        return curr
+    }
 
     useEffect(() => {
         if (canvas) {
@@ -329,211 +449,14 @@ function WhitePadPage() {
                 e.preventDefault()
             }
 
-            // if (connector) {
-            //     setActive(null)
-            //     canvas.on('mouse:over', function (e) {
-            //         if (connector) {
-            //             if (e.target != null) {
-            //                 selected = e.target
-            //                 canvas.setActiveObject(e.target)
-            //                 e.target.set('selectable', false)
-            //                 e.target.set('hasRotatingPoint', false)
-            //                 e.target.set('hasBorders', false)
-            //                 e.target.set('transparentCorners', false)
-            //                 e.target.setControlsVisibility({'tl': false, 'tr': false, 'br': false, 'bl': false})
-            //                 canvas.renderAll()
-            //             }
-            //         }
-                    
-            //         // console.log(e.target)
-                    
-            //     })
-
-            //     canvas.on('mouse:out', function(e) {
-            //         if (connector) {
-            //             if (e.target != null) {
-            //                 selected = null
-            //                 e.target.set('active', false)
-            //                 e.target.set('selectable', true)
-            //                 e.target.set('hasRotatingPoint', true)
-            //                 e.target.set('hasBorders', true)
-            //                 e.target.set('transparentCorners', true)
-            //                 e.target.setControlsVisibility({'tl': true, 'tr': true, 'br': true, 'bl': true})
-            //                 canvas.renderAll()
-            //             }
-            //         }
-            //     })
-
-            //     canvas.on('mouse:down', function(e) {
-            //         if (connector) {
-            //             if (e.target != null) {
-            //                 if (selected) {
-            //                     fromObject = selected
-            //                     var points = null
-    
-            //                     if (fromObject.__corner === undefined){
-            //                         return
-            //                     }
-    
-            //                     isMouseDown = true
-            //                     points = findTargetPort(fromObject)
-            //                     connectorLineFromPort = fromObject.__corner
-            //                     connectorLine = addConnector(points)
-            //                 }
-            //             }
-            //         }
-            //     })
-
-            //     canvas.on('mouse:up', function(e) {
-            //         if (connector) {
-            //             var portCenter = null
-            //             if (isMouseDown !== true) {
-            //                 return
-            //             }
-
-            //             isMouseDown = false
-
-            //             if (selected) {
-            //                 if (selected === fromObject) {
-            //                     if (connectorLine) {
-            //                         removeObj(connectorLine, false)
-            //                         if (connectorLineFromArrow) {
-            //                             removeObj(connectorLineFromArrow, false)
-            //                         }
-            //                     }
-
-            //                     connectorLineFromArrow = null
-            //                     connectorLineFromPort = null
-            //                     connectorLine = null
-
-            //                     return
-            //                 }
-
-            //                 if (selected.__corner === undefined) {
-            //                     if (connectorLine) {
-            //                         removeObj(connectorLine, false)
-            //                         if (connectorLineFromArrow) {
-            //                             removeObj(connectorLineFromArrow, false)
-            //                         }
-            //                     }
-
-            //                     return
-            //                 }
-
-            //                 var toPort = selected.__corner
-            //                 var arrowOptions = {}
-            //                 portCenter = getPortCenter(selected, toPort)
-            //                 connectorLine.set({'x2': portCenter.x2, 'y2': portCenter.y2})
-            //                 arrowOptions.fill = 'ORANGE'
-            //                 var fromArrow = createArrow([connectorLine.x1, connectorLine.y1, portCenter.x2, portCenter.y2], arrowOptions)
-            //                 fromArrow.object = fromObject
-            //                 fromArrow.otherObject = selected
-            //                 fromArrow.isFromArrow = true
-            //                 fromArrow.port = toPort
-            //                 fromArrow.line = connectorLine
-            //                 fromArrow.text = fromObject.text + ' ' + fromArrow.port + ': ->'
-
-            //                 arrowOptions.fill = 'YELLOW'
-            //                 var toArrow = createArrow([portCenter.x2, portCenter.y2, connectorLine.x1, connectorLine.y1], arrowOptions) 
-            //                 toArrow.object = fromArrow.object
-            //                 toArrow.otherObject = fromArrow.otherObject
-            //                 toArrow.isFromArrow = false
-            //                 toArrow.port = connectorLineFromPort
-            //                 toArrow.line = fromArrow.line
-            //                 toArrow.text = fromObject.text + ' ' + toArrow.port + ': <-'
-
-            //                 var index = fromObject.connectors.fromPort.length
-
-            //                 if (index !== 0) {
-            //                     index = index - 1
-            //                 }
-
-            //                 fromArrow.index = index
-            //                 toArrow.index = index
-
-            //                 fromObject.connectors.fromPort.push(connectorLineFromPort)
-            //                 fromObject.connectors.toArrow.push(toArrow)
-            //                 fromObject.connectors.fromLine.push(connectorLine)
-            //                 fromObject.connectors.fromArrow.push(fromArrow)
-            //                 fromObject.connectors.toPort.push(toPort)
-            //                 fromObject.connectors.otherObject.push(selected)
-
-            //                 selected.connectors.fromPort.push(connectorLineFromPort)
-            //                 selected.connectors.toArrow.push(toArrow)
-            //                 selected.connectors.toLine.push(connectorLine)
-            //                 selected.connectors.fromArrow.push(fromArrow)
-            //                 selected.connectors.toPort.push(toPort)
-            //                 selected.connectors.otherObject.push(fromObject)
-
-            //                 arrowOptions.fill = 'BLACK'
-
-            //                 if (connectorLineFromArrow) {
-            //                     removeObj(connectorLineFromArrow, false)
-            //                 }
-
-            //                 connectorLineFromArrow = null
-            //                 connectorLineFromPort = null
-            //                 connectorLine = null
-
-            //             } else {
-            //                 if (connectorLine) {
-            //                     removeObj(connectorLine, false)
-            //                     if (connectorLineFromArrow) {
-            //                         removeObj(connectorLineFromArrow, false)
-            //                     }
-            //                 }
-
-            //                 connectorLineFromArrow = null
-            //                 connectorLineFromPort = null
-            //                 connectorLine = null
-            //             }
-
-            //             canvas.renderAll()
-            //         }
-                    
-            //     })
+            setInitCanvas(true)
 
 
-            //     canvas.on('mouse:move', function(e) {
-            //         if (!isMouseDown) {
-            //             return
-            //         }
-
-            //         var pointer = canvas.getPointer(e.e)
-            //         connectorLine.set({'x2': pointer.x, 'y2': pointer.y})
-            //         canvas.renderAll()
-            //     })
-
-            //     canvas.on('object:moving', function(e) {
-            //         var obj = e.target
-
-            //         if (obj.connectors) {
-            //             var portCenter = null
-            //             var i = null
-
-            //             if (obj.connectors.fromLine.length) {
-            //                 i = 0
-            //                 obj.connectors.fromLine.forEach(function(line) {
-            //                     portCenter = getPortCenter(obj, obj.connectors.fromPort[i])
-            //                     line.set({'x1': portCenter.x1, 'y1': portCenter.y1})
-            //                     moveFromLineArrows(obj, portCenter, i)
-            //                     i++
-            //                 })
-            //             }
-
-            //             if (obj.connectors.toLine.length) {
-            //                 i = 0
-            //                 obj.connectors.toLine.forEach(function(line) {
-            //                     portCenter = getPortCenter(obj, obj.connectors.toPort[i])
-            //                     line.set({'x2': portCenter.x2, 'y2': portCenter.y2})
-            //                     moveToLineArrows(obj, portCenter, i)
-            //                     i++
-            //                 })
-            //             }
-
-            //             canvas.renderAll()
-            //         }
-            //     })
+            // if (initCanvas.current !== null) {
+            //     if (initCanvas.current[0] && initCanvas.current[1] !== null) {
+            //         setCanvas(canvas => canvas.loadFronJSON(initCanvas[1], canvas.renderAll()))
+            //         initCanvas.current = [false]
+            //     }
             // }
 
             canvas.on('mouse:over', function(e) {
@@ -693,6 +616,7 @@ function WhitePadPage() {
                     obj: options.target,
                     id: options.target.id,
                   }
+                  console.log(options.target.left)
                   emitModify(modifiedObj)
 
 
@@ -936,7 +860,7 @@ function WhitePadPage() {
 
     const addToDic = (obj) => {
         const pastState = new objStack()
-        pastState.push(obj.toObject())
+        pastState.push(obj.toObject(['id']))
         const futureState = new objStack()
         objectDic[obj.id] = [pastState, futureState]
     }
@@ -944,15 +868,19 @@ function WhitePadPage() {
     const modifyInDic = (obj) => {
         const info = objectDic[obj.id]
         const past = info[0]
-        past.push(obj.toObject())
+        past.push(obj.toObject(['id']))
         objectDic[obj.id] = [past, info[1]]
+    }
+
+    const removeInDic = (id) => {
+        delete objectDic[id]
     }
 
 
     const addToState = (obj) => {
         wpState.push({action: 'add', object: obj})
         const pastState = new objStack()
-        pastState.push(obj.toObject())
+        pastState.push(obj.toObject(['id']))
         const futureState = new objStack()
         objectDic[obj.id] = [pastState, futureState]
     }
@@ -961,7 +889,7 @@ function WhitePadPage() {
         wpState.push({action: 'modify', object: obj})
         const info = objectDic[obj.id]
         const past = info[0]
-        past.push(obj.toObject())
+        past.push(obj.toObject(['id']))
         objectDic[obj.id] = [past, info[1]]
     }
 
@@ -1017,7 +945,11 @@ function WhitePadPage() {
                 if (object.id === obj.id) {
                     object.set(obj)
                     object.setCoords()
-                    emitModify(object)
+                    const modifiedObj = {
+                        obj: object,
+                        id: object.id,
+                      }
+                    emitModify(modifiedObj)
                     canvas.renderAll()
                 }
             })
@@ -1052,7 +984,11 @@ function WhitePadPage() {
                 canvas.getObjects().forEach(object => {
                     if (object.id === obj.id) {
                         canvas.remove(object)
-                        emitDelete(object)
+                        const modifiedObj = {
+                            obj: object,
+                            id: object.id,
+                          }
+                        emitDelete(modifiedObj)
                     }
                 })
             }
@@ -1191,6 +1127,11 @@ function WhitePadPage() {
                 if (object.id === obj.id) {
                     object.set(obj)
                     object.setCoords()
+                    const modifiedObj = {
+                        obj: object,
+                        id: object.id,
+                      }
+                    emitModify(modifiedObj)
                     canvas.renderAll()
                 }
             })
@@ -1566,11 +1507,13 @@ function WhitePadPage() {
             var objIds = []
             var group = new fabric.Group()
             objs.forEach(function(o) {
+                var l = obj.left - obj.width/2
+                var t = obj.top - obj.height/2
                 var singleDup = null
                 if (o.type === 'rect') {
                     singleDup = new fabric.Rect()
                 } else if (o.type === 'textbox') {
-                    singleDup = new fabric.Textbox()
+                    singleDup = new fabric.Textbox('')
                 } else if (o.type === 'triangle') {
                     singleDup = new fabric.Triangle()
                 } else if (o.type === 'ellispe') {
@@ -1583,9 +1526,16 @@ function WhitePadPage() {
     
                 singleDup.set(o)
                 singleDup.set({id: uuid()})
-                singleDup.set({left: o.left + o.width + 50, top: o.top})
+                if (o.left === l || o.left + o.width === l + obj.width){
+                    console.log(o.type)
+                    singleDup.set({left: o.left + o.width + 50, top: o.top})
+                } else {
+                    console.log(o.type)
+                    singleDup.set({left: o.left + obj.width + 50, top: o.top})
+                }
                 objIds.push(singleDup.id)
                 canvas.add(singleDup)
+                addToState(singleDup)
                 emitAdd({obj: singleDup, id: singleDup.id, oriName: thisname})
                 group.addWithUpdate(singleDup)
                 canvas.remove(singleDup)
@@ -1604,7 +1554,7 @@ function WhitePadPage() {
             if (obj.type === 'rect') {
                 dup = new fabric.Rect()
             } else if (obj.type === 'textbox') {
-                dup = new fabric.Textbox()
+                dup = new fabric.Textbox('')
             } else if (obj.type === 'triangle') {
                 dup = new fabric.Triangle()
             } else if (obj.type === 'ellispe') {
@@ -1650,6 +1600,7 @@ function WhitePadPage() {
         activeObj._restoreObjectsState()
         canvas.remove(activeObj)
         for (var i = 0; i < objectsInGroup.length; i++) {
+            console.log(objectsInGroup[i].id)
             canvas.add(objectsInGroup[i])
             objectsInGroup[i].dirty = true
             canvas.item(canvas.size()-1).hasControls = true;
@@ -1699,9 +1650,10 @@ function WhitePadPage() {
         });
         textbox.set({id: uuid()})
         console.log(textbox)
-        canvi.add(textbox).setActiveObject(textbox)
-        canvi.renderAll()
+        canvas.add(textbox).setActiveObject(textbox)
+        canvas.renderAll()
         textbox.enterEditing()
+        addToState(textbox)
         emitAdd({obj: textbox, id: textbox.id, oriName: thisname})
     }
 
@@ -1722,39 +1674,55 @@ function WhitePadPage() {
     }
 
     const emitAdd = (data) => {
-        socket.emit('object-added', {data, room})
+        var jsonCanvas = JSON.stringify(canvas)
+        socket.emit('object-added', {data, room, objectDic})
     }
 
     const emitModify = (data) => {
-        socket.emit('object-modified', {data, room})
+        var jsonCanvas = JSON.stringify(canvas)
+        socket.emit('object-modified', {data, room, objectDic})
     }
 
     const emitGroup = (data) => {
-        socket.emit('group-added', {data, room})
+        var jsonCanvas = JSON.stringify(canvas)
+        socket.emit('group-added', {data, room, objectDic})
     }
 
     const emitUngroup = (data) => {
-        socket.emit('ungroup', {data, room})
+        var jsonCanvas = JSON.stringify(canvas)
+        socket.emit('ungroup', {data, room, objectDic})
     }
 
     const emitConnector = (data) => {
-        socket.emit('add-connector', {data, room})
+        var jsonCanvas = JSON.stringify(canvas)
+        socket.emit('add-connector', {data, room, objectDic})
     }
 
     const emitRemoveConnector = (data) => {
-        socket.emit('remove-connector', {data, room})
+        var jsonCanvas = JSON.stringify(canvas)
+        socket.emit('remove-connector', {data, room, objectDic})
     }
 
     const emitPositionChange = (option, data) => {
+        var jsonCanvas = JSON.stringify(canvas)
         if (option === 'back') {
-            socket.emit('object-pushBack', {data, room})
+            modifyInState(data.obj)
+            socket.emit('object-pushBack', {data, room, objectDic})
         } else {
-            socket.emit('object-pushFront', {data, room})
+            modifyInState(data.obj)
+            socket.emit('object-pushFront', {data, room, objectDic})
         }
     }
 
     const emitDelete = (data) => {
-        socket.emit('object-delete', ({data, room}))
+        var jsonCanvas = JSON.stringify(canvas)
+        socket.emit('object-delete', ({data, room, objectDic}))
+    }
+
+    const disconnect = () => {
+        socket.disconnect()
+        // return history.push('/')
+        // // return <Redirect to={`/`} />
     }
 
     const selectMode = () => {
@@ -1802,7 +1770,7 @@ function WhitePadPage() {
                             <User name={name} />
                         ))}
                     </Stack>
-                    <Button bg='red' marginTop={5} width='100%'>
+                    <Button bg='red' marginTop={5} width='100%' onClick={() => disconnect()}>
                         Disconnect
                     </Button>
                 </Container>

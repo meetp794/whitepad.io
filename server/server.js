@@ -39,6 +39,16 @@ const getPlayers = (room) => {
     return players
 }
 
+const setDic = (room, dic) => {
+    currentRoom = rooms.get(room)
+    currentRoom.canvas = dic
+}
+
+const getDic = (room) => {
+    currentRoom = rooms.get(room)
+    return currentRoom.canvas
+}
+
 //Put the newly joined player into a room's player list 
 const joinRoom = (player, room, id) => {
     currentRoom = rooms.get(room)
@@ -109,42 +119,51 @@ io.on('connection', socket =>{
         }
     })
 
-    socket.on('object-added', ({data, room, name}) => {
+    socket.on('object-added', ({data, room, name, objectDic}) => {
         console.log(data, room)
+        setDic(room, objectDic)
 
         io.to(room).emit('new-add', {data, name})
     })
 
-    socket.on('object-modified', ({data, room, name}) => {
+    socket.on('object-modified', ({data, room, name , objectDic}) => {
         console.log(data, room)
+        setDic(room, objectDic)
         io.to(room).emit('new-modification', {data, name})
     })
 
-    socket.on('object-pushBack', ({data, room}) => {
+    socket.on('object-pushBack', ({data, room , objectDic}) => {
+        setDic(room, objectDic)
         io.to(room).emit('pushBack', {data})
     })
 
-    socket.on('object-pushFront', ({data, room}) => {
+    socket.on('object-pushFront', ({data, room , objectDic}) => {
+        setDic(room, objectDic)
         io.to(room).emit('pushFront', {data})
     })
 
-    socket.on('object-delete', ({data, room}) => {
+    socket.on('object-delete', ({data, room , objectDic}) => {
+        setDic(room, objectDic)
         io.to(room).emit('delete-object', {data})
     })
 
-    socket.on('group-added', ({data, room}) => {
+    socket.on('group-added', ({data, room , objectDic}) => {
+        setDic(room, objectDic)
         io.to(room).emit('new-group', {data})
     })
 
-    socket.on('ungroup', ({data, room}) => {
+    socket.on('ungroup', ({data, room, objectDic}) => {
+        setDic(room, objectDic)
         io.to(room).emit('ungroup', {data})
     })
 
-    socket.on('add-connector', ({data, room}) => {
+    socket.on('add-connector', ({data, room, objectDic}) => {
+        setDic(room, objectDic)
         io.to(room).emit('new-connector', {data})
     })
 
-    socket.on('remove-connector', ({data, room}) => {
+    socket.on('remove-connector', ({data, room, objectDic}) => {
+        setDic(room, objectDic)
         io.to(room).emit('remove-connector', {data})
     })
 
@@ -160,8 +179,10 @@ io.on('connection', socket =>{
         const id = socket.id
         joinRoom(name, room, id)
         const users = getPlayers(rooms.get(room))
+        currentRoom = rooms.get(room)
+        const initObjs = getDic(room)
         socketRooms[id] = room
-        io.to(room).emit('usersUpdate', {users})
+        io.to(room).emit('usersUpdate', {users, initObjs, name})
 
         //Get the number of player in the room
         const peopleInRoom = getRoomPlayersNum(room)

@@ -3,7 +3,7 @@ import Choice from '../Components/Choice'
 import InputForm from '../Components/InputForm'
 import { socketContext } from '../Context/socket'
 
-import { Redirect } from 'react-router'
+import { Redirect, useHistory } from 'react-router'
 import socketIOClient from 'socket.io-client'
 const ENDPOINT = 'http://localhost:4000'
 
@@ -17,6 +17,7 @@ function IndexPage() {
     const [serverConfirmed, setServerConfirmed] = useState(false)
     const [error, setError] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
+    const history = useHistory()
 
     useEffect(() => {
 
@@ -92,9 +93,11 @@ function IndexPage() {
     }
 
     if (serverConfirmed) {
+        console.log('yes')
         return (
             <Redirect to={ `/whitepad?room=${room}&name=${name}`} />
         )
+        // return history.push(`/whitepad?room=${room}&name=${name}`)
     } else {
         switch(step) {
             case(1):
